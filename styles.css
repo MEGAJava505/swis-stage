@@ -116,6 +116,21 @@ body.mobile-test {
     color: #000;
 }
 
+.btn-save {
+    background: var(--green);
+    color: white;
+}
+
+.btn-shuffle {
+    background: #8b5cf6;
+    color: white;
+}
+
+.btn-shuffle:hover {
+    background: #6366f1;
+    color: white;
+}
+
 .btn-mobile {
     background: #6366f1;
     color: white;
@@ -446,7 +461,66 @@ body.mobile-test {
     display: flex;
     gap: 0;
     min-width: fit-content;
-    align-items: flex-start;
+    align-items: center;
+}
+
+.flow-connector {
+    width: 55px;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    align-self: stretch;
+    margin: 0 6px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+}
+
+.flow-connector.active {
+    opacity: 1;
+}
+
+.flow-pool-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.flow-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 4px;
+}
+
+.flow-bar-winner .flow-team {
+    border-left: 2px solid var(--green);
+}
+
+.flow-bar-loser .flow-team {
+    border-left: 2px solid var(--red);
+}
+
+.flow-team {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 4px;
+    background: var(--bg-team);
+    border-radius: 3px;
+}
+
+.flow-flag {
+    width: 20px;
+    height: auto;
+}
+
+.flow-logo {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
 }
 
 .stage {
@@ -488,18 +562,31 @@ body.mobile-test {
     display: flex;
     flex-direction: column;
     justify-content: space-around;
-    padding: 0 0.35rem;
-    width: 35px;
+    align-items: center;
+    padding: 0.5rem 0.25rem;
+    width: 50px;
     flex-shrink: 0;
     min-height: 250px;
+    background: rgba(20, 24, 32, 0.5);
+    border-radius: 4px;
 }
 
 .arrow-group {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     flex: 1;
+    gap: 0.15rem;
+    width: 100%;
+    padding: 0.25rem 0;
 }
+
+.arrow-group.winners-flow {
+    border-left: 2px solid var(--green);
+}
+
+/* Flow styles removed */
 
 .arrow-label {
     writing-mode: vertical-rl;
@@ -547,6 +634,9 @@ body.mobile-test {
     padding-bottom: 0.4rem;
     border-bottom: 1px solid var(--border-pool);
 }
+
+/* Pending teams waiting for matchup */
+/* Pending teams styles removed */
 
 /* ===== Matches ===== */
 .matches-list {
@@ -897,5 +987,17 @@ body.mobile-test .setup-list {
     to {
         opacity: 1;
         transform: translateX(-50%) translateY(0);
+    }
+}
+
+@keyframes flowIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) scale(0.8);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(-50%) scale(1);
     }
 }

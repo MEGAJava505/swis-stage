@@ -62,6 +62,7 @@ function resetTournament() {
     });
 
     renderAll();
+    setTimeout(renderFlowConnectors, 10);
     updateMinimap();
     renderMobileStage();
 }
@@ -77,15 +78,30 @@ function setupEventListeners() {
         resetTournament();
     });
 
+    // Save button handler
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => savePrediction());
+    }
+
+    // Shuffle button handler - reshuffles pending matchups in each pool
+    const shuffleBtn = document.getElementById('shuffleBtn');
+    if (shuffleBtn) {
+        shuffleBtn.addEventListener('click', shufflePendingMatchups);
+    }
+
     document.getElementById('setupBtn').addEventListener('click', openSetupModal);
     document.getElementById('applySetup').addEventListener('click', applySetup);
     document.getElementById('cancelSetup').addEventListener('click', closeSetupModal);
     document.querySelector('.modal-overlay')?.addEventListener('click', closeSetupModal);
 
-    document.getElementById('mobileTestBtn').addEventListener('click', () => {
-        document.body.classList.toggle('mobile-test');
-        renderMobileStage();
-    });
+    const mobileTestBtn = document.getElementById('mobileTestBtn');
+    if (mobileTestBtn) {
+        mobileTestBtn.addEventListener('click', () => {
+            document.body.classList.toggle('mobile-test');
+            renderMobileStage();
+        });
+    }
 
     // Minimap stage clicks
     document.querySelectorAll('.mini-stage').forEach(el => {
@@ -311,6 +327,7 @@ function applySetup() {
     generateMatches();
     closeSetupModal();
     renderAll();
+    setTimeout(renderFlowConnectors, 10);
     renderMobileStage();
 }
 
@@ -331,17 +348,151 @@ function selectWinner(matchId, winnerId) {
     if (!match || match.winner) return;
 
     const loserId = match.team1 === winnerId ? match.team2 : match.team1;
+    const winner = state.teams[winnerId];
+    const loser = state.teams[loserId];
+
     match.winner = winnerId;
-    state.teams[winnerId].wins++;
-    state.teams[loserId].losses++;
+    winner.wins++;
+    loser.losses++;
 
-    if (state.teams[winnerId].wins >= 3) state.teams[winnerId].qualified = true;
-    if (state.teams[loserId].losses >= 3) state.teams[loserId].eliminated = true;
+    if (winner.wins >= 3) winner.qualified = true;
+    if (loser.losses >= 3) loser.eliminated = true;
 
-    generateNewMatches();
     renderAll();
+    setTimeout(renderFlowConnectors, 10);
     renderMobileStage();
     checkAutoAdvance();
+}
+
+// Render team icons in arrow columns between stages
+function renderFlowTeams() {
+    return; // Functionality disabled by user request
+    /*
+    const transitions = {
+        '0-0': { winners: '1-0', losers: '0-1', arrow: 1 },
+        '1-0': { winners: '2-0', losers: '1-1', arrow: 2 },
+        '0-1': { winners: '1-1', losers: '0-2', arrow: 2 },
+        '2-0': { winners: '3-0', losers: '2-1', arrow: 3 },
+        '1-1': { winners: '2-1', losers: '1-2', arrow: 3 },
+        '0-2': { winners: '1-2', losers: '0-3', arrow: 3 },
+        '2-1': { winners: '3-1', losers: '2-2', arrow: 4 },
+        '1-2': { winners: '2-2', losers: '1-3', arrow: 4 },
+        '2-2': { winners: '3-2', losers: '2-3', arrow: 5 }
+    };
+    
+    // Process each arrow column
+    for (let arrowNum = 1; arrowNum <= 5; arrowNum++) {
+        const winnersContainer = document.getElementById(`flow-winners-${arrowNum}`);
+        const losersContainer = document.getElementById(`flow-losers-${arrowNum}`);
+        if (!winnersContainer || !losersContainer) continue;
+    
+        let allWinners = [];
+        let allLosers = [];
+    
+        // Find all source pools for this arrow
+        Object.entries(transitions).forEach(([sourcePool, dest]) => {
+            if (dest.arrow !== arrowNum) return;
+    
+            // Get decided matches from this source pool
+            const decidedMatches = Object.values(state.matches).filter(m => m.pool === sourcePool && m.winner);
+    
+            decidedMatches.forEach(m => {
+                const winner = state.teams[m.winner];
+                const loserId = m.team1 === m.winner ? m.team2 : m.team1;
+                const loser = state.teams[loserId];
+    
+                // Check if team already has a match in destination pool (then don't show in arrow)
+                const winnerHasMatch = Object.values(state.matches).some(
+                    match => match.pool === dest.winners && (match.team1 === winner.id || match.team2 === winner.id)
+                );
+                const loserHasMatch = Object.values(state.matches).some(
+                    match => match.pool === dest.losers && (match.team1 === loser.id || match.team2 === loser.id)
+                );
+    
+                // Only show if team doesn't have a match yet and isn't qualified/eliminated
+                if (!winnerHasMatch && !winner.qualified) {
+                    allWinners.push(winner);
+                }
+                if (!loserHasMatch && !loser.eliminated) {
+                    allLosers.push(loser);
+                }
+            });
+        });
+    
+        winnersContainer.innerHTML = allWinners.map(t => `
+            <div class="flow-team-icon winner">
+                <img src="${t.flag}" class="team-flag">
+                <span>${t.code}</span>
+            </div>
+        `).join('');
+    
+        losersContainer.innerHTML = allLosers.map(t => `
+            <div class="flow-team-icon loser">
+                <img src="${t.flag}" class="team-flag">
+                <span>${t.code}</span>
+            </div>
+        `).join('');
+        }
+        */
+}
+
+function showFlowIndicator(teamCode, destination, type) {
+    // Remove existing flow popup if any
+    const existing = document.querySelector('.flow-popup');
+
+    if (!existing) {
+        // Create new popup container
+        const popup = document.createElement('div');
+        popup.className = 'flow-popup';
+        popup.innerHTML = `
+        <div class="flow-title">📍 ПЕРЕХОД</div>
+        <div class="flow-items"></div>
+    `;
+        popup.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(10, 12, 16, 0.98);
+        border: 3px solid #b89d2a;
+        padding: 1.25rem 2rem;
+        border-radius: 12px;
+        z-index: 1000;
+        animation: flowIn 0.3s ease;
+        box-shadow: 0 8px 40px rgba(0,0,0,0.8);
+        min-width: 200px;
+    `;
+        document.body.appendChild(popup);
+
+        // Auto-remove after delay
+        setTimeout(() => popup.remove(), 2000);
+    }
+
+    const popup = document.querySelector('.flow-popup');
+    const itemsContainer = popup.querySelector('.flow-items');
+
+    const color = type === 'winner' ? '#22c55e' : '#dc2626';
+    const icon = type === 'winner' ? '🏆' : '💀';
+    const label = type === 'winner' ? 'WIN' : 'LOSE';
+
+    const item = document.createElement('div');
+    item.style.cssText = `
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    color: white;
+`;
+    item.innerHTML = `
+    <span style="font-size: 1.25rem;">${icon}</span>
+    <span style="font-weight: 700; font-size: 1.1rem;">${teamCode}</span>
+    <span style="color: ${color}; font-size: 0.75rem; background: ${color}22; padding: 0.2rem 0.5rem; border-radius: 4px;">${label}</span>
+    <span style="font-family: 'Bebas Neue'; font-size: 1.3rem; color: ${color};">→ ${destination}</span>
+`;
+
+    itemsContainer.appendChild(item);
 }
 
 function generateNewMatches() {
@@ -351,10 +502,68 @@ function generateNewMatches() {
         const inMatches = new Set();
         Object.values(state.matches).forEach(m => { if (m.pool === pool && !m.winner) { inMatches.add(m.team1); inMatches.add(m.team2); } });
         const need = teams.filter(t => !inMatches.has(t.id));
+
+        // Auto-shuffle teams before pairing
+        for (let i = need.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [need[i], need[j]] = [need[j], need[i]];
+        }
+
         for (let i = 0; i < need.length - 1; i += 2) {
             state.matches[`new-${pool}-${Date.now()}-${i}`] = { pool, team1: need[i].id, team2: need[i + 1].id, winner: null };
         }
     });
+}
+
+// Shuffle all pending (unpicked) matchups in each pool
+function shufflePendingMatchups() {
+    const pools = ['0-0', '1-0', '0-1', '2-0', '1-1', '0-2', '2-1', '1-2', '2-2'];
+
+    pools.forEach(pool => {
+        // Get all pending matches in this pool
+        const pendingMatchIds = Object.entries(state.matches)
+            .filter(([, m]) => m.pool === pool && !m.winner)
+            .map(([id]) => id);
+
+        if (pendingMatchIds.length < 2) return; // Nothing to shuffle
+
+        // Collect all teams from pending matches
+        const teamsInPool = [];
+        pendingMatchIds.forEach(id => {
+            teamsInPool.push(state.matches[id].team1);
+            teamsInPool.push(state.matches[id].team2);
+            // Remove old match
+            delete state.matches[id];
+        });
+
+        // Shuffle teams
+        for (let i = teamsInPool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [teamsInPool[i], teamsInPool[j]] = [teamsInPool[j], teamsInPool[i]];
+        }
+
+        // Create new matchups
+        for (let i = 0; i < teamsInPool.length - 1; i += 2) {
+            state.matches[`shuffle-${pool}-${Date.now()}-${i}`] = {
+                pool,
+                team1: teamsInPool[i],
+                team2: teamsInPool[i + 1],
+                winner: null
+            };
+        }
+    });
+
+    renderAll();
+    setTimeout(renderFlowConnectors, 10);
+    renderMobileStage();
+
+    // Show notification
+    const notification = document.createElement('div');
+    notification.className = 'save-notification';
+    notification.textContent = '🎲 Матчи перемешаны!';
+    notification.style.background = '#8b5cf6';
+    document.body.appendChild(notification);
+    setTimeout(() => notification.remove(), 2000);
 }
 
 function checkAutoAdvance() {
@@ -369,10 +578,61 @@ function checkAutoAdvance() {
     if (allDone && pools.length > 0) {
         const idx = STAGES.indexOf(state.currentStage);
         if (idx < STAGES.length - 1) {
+            // Stage complete! Generate shuffled matchups for next stage pools
+            const nextStage = STAGES[idx + 1];
+            const nextPools = STAGE_POOLS[nextStage] || [];
+
+            nextPools.forEach(pool => {
+                const [w, l] = pool.split('-').map(Number);
+                // Get all teams that should be in this pool
+                const teamsForPool = Object.values(state.teams).filter(t =>
+                    t.wins === w && t.losses === l && !t.qualified && !t.eliminated
+                );
+
+                // Check if they already have matches in this pool
+                const inMatches = new Set();
+                Object.values(state.matches).forEach(m => {
+                    if (m.pool === pool) {
+                        inMatches.add(m.team1);
+                        inMatches.add(m.team2);
+                    }
+                });
+
+                const needMatchup = teamsForPool.filter(t => !inMatches.has(t.id));
+
+                if (needMatchup.length >= 2) {
+                    // SHUFFLE the teams (Fisher-Yates)
+                    for (let i = needMatchup.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [needMatchup[i], needMatchup[j]] = [needMatchup[j], needMatchup[i]];
+                    }
+
+                    // Create random matchups
+                    for (let i = 0; i < needMatchup.length - 1; i += 2) {
+                        state.matches[`stage-${pool}-${Date.now()}-${i}`] = {
+                            pool,
+                            team1: needMatchup[i].id,
+                            team2: needMatchup[i + 1].id,
+                            winner: null
+                        };
+                    }
+                }
+            });
+
             setTimeout(() => {
-                state.currentStage = STAGES[idx + 1];
+                state.currentStage = nextStage;
                 updateMinimap();
+                renderAll();
+                renderFlowConnectors();
                 renderMobileStage();
+
+                // Show shuffle notification
+                const notification = document.createElement('div');
+                notification.className = 'save-notification';
+                notification.textContent = '🎲 Следующий этап — матчи перемешаны!';
+                notification.style.background = '#8b5cf6';
+                document.body.appendChild(notification);
+                setTimeout(() => notification.remove(), 2500);
             }, 400);
         }
     }
@@ -423,10 +683,22 @@ function renderResult(score) {
 }
 
 // ===== Firebase Auto-Save =====
+
+// Word lists for readable usernames
+const ADJECTIVES = ['Red', 'Blue', 'Green', 'Golden', 'Silver', 'Dark', 'Bright', 'Swift', 'Brave', 'Lucky', 'Wild', 'Calm', 'Fierce', 'Noble', 'Silent', 'Mystic'];
+const ANIMALS = ['Wolf', 'Tiger', 'Eagle', 'Dragon', 'Phoenix', 'Lion', 'Bear', 'Hawk', 'Falcon', 'Panther', 'Fox', 'Raven', 'Shark', 'Cobra', 'Lynx', 'Owl'];
+
+function generateReadableName() {
+    const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+    const animal = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+    const num = Math.floor(Math.random() * 99) + 1;
+    return `${adj}_${animal}_${num}`;
+}
+
 function getUserId() {
     let id = localStorage.getItem('m7_user_id');
     if (!id) {
-        id = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+        id = generateReadableName();
         localStorage.setItem('m7_user_id', id);
     }
     return id;
@@ -435,10 +707,20 @@ function getUserId() {
 function getUserNumber() {
     let num = localStorage.getItem('m7_user_number');
     if (!num) {
-        num = Math.floor(Math.random() * 9000) + 1000; // Random 4-digit number
+        num = Math.floor(Math.random() * 9000) + 1000;
         localStorage.setItem('m7_user_number', num.toString());
     }
     return parseInt(num);
+}
+
+// Generate consistent color from userId for visual identification
+function getColorFromUserId(userId) {
+    let hash = 0;
+    for (let i = 0; i < userId.length; i++) {
+        hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = Math.abs(hash % 360);
+    return `hsl(${hue}, 70%, 50%)`;
 }
 
 function getDeviceInfo() {
@@ -480,19 +762,23 @@ function isTournamentComplete() {
     return qualified === 8 && eliminated === 8;
 }
 
-function savePrediction() {
+function savePrediction(retryCount = 0) {
     if (typeof db === 'undefined') {
         console.log('Firebase not configured - skipping save');
-        return;
+        return Promise.reject('Firebase not configured');
     }
 
+    const maxRetries = 3;
     const qualified = Object.values(state.teams).filter(t => t.qualified);
     const eliminated = Object.values(state.teams).filter(t => t.eliminated);
+    const userId = getUserId();
 
     const predictionData = {
-        userId: getUserId(),
+        userId: userId,
+        userColor: getColorFromUserId(userId),
         timestamp: new Date().toISOString(),
         localTime: new Date().toLocaleString('ru-RU'),
+        isComplete: isTournamentComplete(),
         qualified: qualified.map(t => ({
             code: t.code,
             name: t.name,
@@ -509,16 +795,64 @@ function savePrediction() {
             losses: t.losses,
             qualified: t.qualified,
             eliminated: t.eliminated
+        })),
+        // Save full match history for visualization
+        matchHistory: Object.entries(state.matches).map(([id, m]) => ({
+            matchId: id,
+            pool: m.pool,
+            team1: m.team1,
+            team2: m.team2,
+            winner: m.winner
         }))
     };
 
-    db.collection('predictions').add(predictionData)
+    return db.collection('predictions').add(predictionData)
         .then(() => {
-            console.log('Prediction saved!');
+            console.log('✅ Prediction saved!');
+            showSaveNotification('success');
+            return true;
         })
         .catch(err => {
-            console.error('Error saving:', err);
+            console.error(`❌ Error saving (attempt ${retryCount + 1}/${maxRetries}):`, err);
+
+            if (retryCount < maxRetries - 1) {
+                // Exponential backoff: 1s, 2s, 4s
+                const delay = Math.pow(2, retryCount) * 1000;
+                console.log(`🔄 Retrying in ${delay / 1000}s...`);
+                return new Promise(resolve => setTimeout(resolve, delay))
+                    .then(() => savePrediction(retryCount + 1));
+            } else {
+                showSaveNotification('error');
+                throw err;
+            }
         });
+}
+
+function showSaveNotification(type) {
+    // Remove existing notification if any
+    const existing = document.querySelector('.save-notification');
+    if (existing) existing.remove();
+
+    const notification = document.createElement('div');
+    notification.className = `save-notification ${type}`;
+    notification.textContent = type === 'success'
+        ? '✅ Сохранено!'
+        : '❌ Ошибка сохранения';
+    notification.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 12px 24px;
+    border-radius: 8px;
+    color: white;
+    font-weight: bold;
+    z-index: 9999;
+    animation: slideIn 0.3s ease;
+    background: ${type === 'success' ? '#22c55e' : '#dc2626'};
+`;
+    document.body.appendChild(notification);
+
+    setTimeout(() => notification.remove(), 3000);
 }
 
 function checkAndAutoSave() {
@@ -536,4 +870,113 @@ checkAutoAdvance = function () {
 };
 
 document.addEventListener('DOMContentLoaded', init);
+
+// Render dynamic flow connectors (lines between stages)
+function renderFlowConnectors() {
+    const transitions = [
+        { arrow: 1, src: ['0-0'], destW: ['1-0'], destL: ['0-1'] },
+        { arrow: 2, src: ['1-0', '0-1'], destW: ['2-0', '1-1'], destL: ['1-1', '0-2'] },
+        { arrow: 3, src: ['2-0', '1-1', '0-2'], destW: ['3-0', '2-1', '1-2'], destL: ['2-1', '1-2', '0-3'] },
+        { arrow: 4, src: ['2-1', '1-2'], destW: ['3-1', '2-2'], destL: ['2-2', '1-3'] },
+        { arrow: 5, src: ['2-2'], destW: ['3-2'], destL: ['2-3'] }
+    ];
+
+    // Determine active stage (show latest stage that has visual progress)
+    let activeArrow = 0;
+    for (let i = 5; i >= 1; i--) {
+        const trans = transitions.find(t => t.arrow === i);
+        const hasDecided = Object.values(state.matches).some(m => trans.src.includes(m.pool) && m.winner);
+        if (hasDecided) {
+            activeArrow = i;
+            break;
+        }
+    }
+
+    // Render connectors
+    for (let i = 1; i <= 5; i++) {
+        const connector = document.getElementById(`conn-${i}`);
+        if (!connector) continue;
+
+        if (i === activeArrow) {
+            connector.classList.add('active');
+            renderFlowTeamIcons(connector, transitions.find(t => t.arrow === i));
+        } else {
+            connector.classList.remove('active');
+            connector.innerHTML = '';
+        }
+    }
+}
+
+function renderFlowTeamIcons(container, trans) {
+    // Get decided matches from source pools
+    const decidedMatches = Object.values(state.matches).filter(m => trans.src.includes(m.pool) && m.winner);
+
+    if (decidedMatches.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    // Group by source pool
+    const poolGroups = {};
+    trans.src.forEach(pool => {
+        poolGroups[pool] = { winners: [], losers: [] };
+    });
+
+    decidedMatches.forEach(m => {
+        const winnerTeam = state.teams[m.winner];
+        const loserId = m.team1 === m.winner ? m.team2 : m.team1;
+        const loserTeam = state.teams[loserId];
+
+        if (poolGroups[m.pool]) {
+            if (winnerTeam && !winnerTeam.qualified) {
+                poolGroups[m.pool].winners.push(winnerTeam);
+            }
+            if (loserTeam && !loserTeam.eliminated) {
+                poolGroups[m.pool].losers.push(loserTeam);
+            }
+        }
+    });
+
+    // Build HTML - each pool gets its own winner/loser bars
+    // Sort pools by position: upper pools (more wins) first, lower pools (more losses) last
+    const sortedPools = [...trans.src].sort((a, b) => {
+        const [winsA, lossesA] = a.split('-').map(Number);
+        const [winsB, lossesB] = b.split('-').map(Number);
+        // Sort by wins descending (upper pools first), then by losses ascending
+        return (winsB - lossesB) - (winsA - lossesA);
+    });
+
+    let html = '';
+    sortedPools.forEach(pool => {
+        const group = poolGroups[pool];
+        if (group.winners.length > 0 || group.losers.length > 0) {
+            // Determine position class based on wins vs losses
+            const [wins, losses] = pool.split('-').map(Number);
+            const posClass = wins > losses ? 'flow-pool-upper' : (losses > wins ? 'flow-pool-lower' : 'flow-pool-mid');
+
+            html += `
+                <div class="flow-pool-group ${posClass}">
+                    <div class="flow-bar flow-bar-winner">
+                        ${group.winners.map(t => `
+                            <div class="flow-team">
+                                <img src="${t.flag}" class="flow-flag">
+                                <img src="${t.logo}" class="flow-logo">
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="flow-bar flow-bar-loser">
+                        ${group.losers.map(t => `
+                            <div class="flow-team">
+                                <img src="${t.flag}" class="flow-flag">
+                                <img src="${t.logo}" class="flow-logo">
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+    });
+
+    container.innerHTML = html;
+}
 

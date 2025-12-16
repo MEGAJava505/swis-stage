@@ -25,7 +25,9 @@
         <!-- Controls -->
         <div class="controls">
             <button id="resetBtn" class="btn btn-reset">🔄 Сбросить</button>
-            <button id="swapWcBtn" class="btn btn-swap">🔀 WC1↔WC2</button>
+            <button id="saveBtn" class="btn btn-save">💾 Сохранить</button>
+            <button id="swapWcBtn" class="btn btn-swap">� WC1↔WC2</button>
+            <button id="mobileTestBtn" class="btn btn-mobile">Мобильная</button>
             <button id="setupBtn" class="btn btn-setup">⚙️</button>
         </div>
 
@@ -38,12 +40,16 @@
                     <div class="mini-footer">ЭТАП 1</div>
                 </div>
 
+                <div class="flow-connector mobile-flow" id="mob-conn-2"></div>
+
                 <!-- Stage 2 -->
                 <div class="mini-stage" data-stage="2">
                     <div class="mini-pool winners" data-pool="1-0">1-0</div>
                     <div class="mini-pool losers" data-pool="0-1">0-1</div>
                     <div class="mini-footer">ЭТАП 2</div>
                 </div>
+
+                <div class="flow-connector mobile-flow" id="mob-conn-3"></div>
 
                 <!-- Stage 3 -->
                 <div class="mini-stage" data-stage="3">
@@ -52,6 +58,8 @@
                     <div class="mini-pool losers" data-pool="0-2">0-2</div>
                     <div class="mini-footer">ЭТАП 3</div>
                 </div>
+
+                <div class="flow-connector mobile-flow" id="mob-conn-4"></div>
 
                 <!-- Stage 4 -->
                 <div class="mini-stage" data-stage="4">
@@ -62,6 +70,8 @@
                     <div class="mini-footer">ЭТАП 4</div>
                 </div>
 
+                <div class="flow-connector mobile-flow" id="mob-conn-5"></div>
+
                 <!-- Stage 5 -->
                 <div class="mini-stage" data-stage="5">
                     <div class="mini-result qualified">3-1</div>
@@ -69,6 +79,8 @@
                     <div class="mini-result eliminated">1-3</div>
                     <div class="mini-footer">ЭТАП 5</div>
                 </div>
+
+                <div class="flow-connector mobile-flow" id="mob-conn-final"></div>
 
                 <!-- Final -->
                 <div class="mini-stage" data-stage="final">
@@ -120,11 +132,9 @@
                         <div class="stage-date">10 янв, 2026</div>
                     </div>
                 </div>
-                <div class="arrow-col">
-                    <div class="arrow-group"><span class="arrow-label">ПОБЕДИТЕЛИ</span></div>
-                    <div class="arrow-group"><span class="arrow-label">ПРОИГРАВШИЕ</span></div>
-                </div>
 
+
+                <div class="flow-connector" id="conn-1"></div>
                 <!-- ЭТАП 2 -->
                 <div class="stage" data-stage="2">
                     <div class="pool-box pool-winners">
@@ -142,12 +152,10 @@
                         <div class="stage-date">11 янв</div>
                     </div>
                 </div>
-                <div class="arrow-col">
-                    <div class="arrow-group"><span class="arrow-label">ПОБ</span></div>
-                    <div class="arrow-group"><span class="arrow-label">П/П</span></div>
-                    <div class="arrow-group"><span class="arrow-label">ПР</span></div>
-                </div>
 
+
+
+                <div class="flow-connector" id="conn-2"></div>
                 <!-- ЭТАП 3 -->
                 <div class="stage" data-stage="3">
                     <div class="pool-box pool-winners">
@@ -170,12 +178,9 @@
                         <div class="stage-date">12-13 янв</div>
                     </div>
                 </div>
-                <div class="arrow-col">
-                    <div class="arrow-group"><span class="arrow-label">ПОБ</span></div>
-                    <div class="arrow-group"><span class="arrow-label">П/П</span></div>
-                    <div class="arrow-group"><span class="arrow-label">ПР</span></div>
-                </div>
 
+
+                <div class="flow-connector" id="conn-3"></div>
                 <!-- ЭТАП 4 -->
                 <div class="stage" data-stage="4">
                     <div class="result-box qualified">
@@ -203,12 +208,9 @@
                         <div class="stage-date">15-16 янв</div>
                     </div>
                 </div>
-                <div class="arrow-col">
-                    <div class="arrow-group"><span class="arrow-label">ПОБ</span></div>
-                    <div class="arrow-group"><span class="arrow-label">П/П</span></div>
-                    <div class="arrow-group"><span class="arrow-label">ПР</span></div>
-                </div>
 
+
+                <div class="flow-connector" id="conn-4"></div>
                 <!-- ЭТАП 5 -->
                 <div class="stage" data-stage="5">
                     <div class="result-box qualified">
@@ -231,11 +233,9 @@
                         <div class="stage-date">17 янв</div>
                     </div>
                 </div>
-                <div class="arrow-col">
-                    <div class="arrow-group"><span class="arrow-label">ПОБ</span></div>
-                    <div class="arrow-group"><span class="arrow-label">ПР</span></div>
-                </div>
 
+
+                <div class="flow-connector" id="conn-5"></div>
                 <!-- ФИНАЛ -->
                 <div class="stage stage-final" data-stage="final">
                     <div class="result-box qualified">
