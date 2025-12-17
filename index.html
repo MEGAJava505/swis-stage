@@ -25,9 +25,11 @@
         <!-- Controls -->
         <div class="controls">
             <button id="resetBtn" class="btn btn-reset">🔄 Сбросить</button>
-            <button id="saveBtn" class="btn btn-save">💾 Сохранить</button>
+            <button id="saveBtn" class="btn btn-save">💾</button>
+            <input type="text" id="nickInput" class="nick-input" placeholder="Напишите ник..." maxlength="15">
+
             <button id="swapWcBtn" class="btn btn-swap">� WC1↔WC2</button>
-            <button id="mobileTestBtn" class="btn btn-mobile">Мобильная</button>
+
             <button id="setupBtn" class="btn btn-setup">⚙️</button>
         </div>
 
@@ -259,27 +261,27 @@
             <span class="ticker-sep">▸</span>
             <span>ROAD TO JAKARTA</span>
         </div>
+
+        <!-- Nickname Modal (shown at tournament end) -->
+        <div id="nickModal" class="modal hidden">
+            <div class="modal-content">
+                <h2>🏆 Турнир завершён!</h2>
+                <p style="color: #bbb; font-size: 0.9rem; margin-bottom: 1rem;">Напишите ник и сохраните:</p>
+                <input type="text" id="nicknameInput" placeholder="Ваш ник..." maxlength="15">
+                <div class="modal-buttons">
+                    <button id="saveNickBtn" class="btn btn-trigger">💾 Сохранить</button>
+                    <button id="closeNickBtn" class="btn btn-reset">Отмена</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
-    <!-- Firebase Config - ЗАМЕНИ НА СВОИ ДАННЫЕ -->
-    <script>
-        // ⚠️ ВАЖНО: Замени эти данные на свои из Firebase Console
-        const firebaseConfig = {
-            apiKey: "AIzaSyC5Oe2Rp06qO5uCvzeUa0xcZxwg6AHTkTY",
-            authDomain: "m7-predictor.firebaseapp.com",
-            projectId: "m7-predictor",
-            storageBucket: "m7-predictor.firebasestorage.app",
-            messagingSenderId: "751494816474",
-            appId: "1:751494816474:web:e6d5b68193883a4e2b7be3"
-        };
-
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-    </script>
+    <!-- Firebase Config -->
+    <script src="firebase-config.js"></script>
 
     <script src="app.js"></script>
 </body>

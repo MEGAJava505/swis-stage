@@ -980,3 +980,150 @@ function renderFlowTeamIcons(container, trans) {
     container.innerHTML = html;
 }
 
+// ==========================================
+// USER NICKNAME & SAVE LOGIC
+// ==========================================
+
+// --- Open Nickname/Save Modal ---
+function openSaveModal() {
+    const modal = document.getElementById('nickModal');
+    const modalInput = document.getElementById('nicknameInput');
+    const panelInput = document.getElementById('nickInput');
+    modal.classList.remove('hidden');
+    // Sync modal input with panel input
+    modalInput.value = panelInput?.value || localStorage.getItem('m7_nickname') || '';
+    modalInput.focus();
+}
+
+// Handler for Save button - saves directly using panel input
+document.getElementById('saveBtn')?.addEventListener('click', () => {
+    savePrediction();
+});
+
+document.getElementById('closeNickBtn')?.addEventListener('click', () => {
+    document.getElementById('nickModal').classList.add('hidden');
+});
+
+document.getElementById('saveNickBtn')?.addEventListener('click', () => {
+    const modalNick = document.getElementById('nicknameInput').value.trim();
+    const panelInput = document.getElementById('nickInput');
+
+    // Sync panel input with modal input
+    if (panelInput) panelInput.value = modalNick;
+
+    // Save to localStorage
+    if (modalNick) {
+        localStorage.setItem('m7_nickname', modalNick);
+    } else {
+        localStorage.removeItem('m7_nickname');
+    }
+    document.getElementById('nickModal').classList.add('hidden');
+
+    // Save to Firebase
+    savePrediction();
+});
+
+// --- Constants & Helpers ---
+
+function getUserId() {
+    let id = localStorage.getItem('m7_user_id');
+    if (!id) {
+        id = 'user_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+        localStorage.setItem('m7_user_id', id);
+    }
+    return id;
+}
+
+function getNickname() {
+    // Priority: panel input > localStorage
+    const panelInput = document.getElementById('nickInput');
+    if (panelInput && panelInput.value.trim()) {
+        return panelInput.value.trim();
+    }
+    return localStorage.getItem('m7_nickname') || null;
+}
+
+function isTournamentComplete() {
+    if (typeof state === 'undefined') return false;
+    // 8 qualified and 8 eliminated
+    const qualified = Object.values(state.teams).filter(t => t.qualified).length;
+    const eliminated = Object.values(state.teams).filter(t => t.eliminated).length;
+    return qualified === 8 && eliminated === 8;
+}
+
+// --- Main Save Function ---
+window.savePrediction = function () {
+    if (typeof db === 'undefined') {
+        console.log('Firebase not configured - skipping save');
+        return;
+    }
+
+    const qualified = Object.values(state.teams).filter(t => t.qualified);
+    const eliminated = Object.values(state.teams).filter(t => t.eliminated);
+
+    if (qualified.length === 0 && eliminated.length === 0) {
+        alert('Сначала сделайте прогноз!');
+        return;
+    }
+
+    const predictionData = {
+        userId: getUserId(),
+        nickname: getNickname(), // <--- NEW FIELD
+        timestamp: new Date().toISOString(),
+        localTime: new Date().toLocaleString('ru-RU'),
+        qualified: qualified.map(t => ({
+            code: t.code,
+            name: t.name,
+            score: `${t.wins}-${t.losses}`
+        })),
+        eliminated: eliminated.map(t => ({
+            code: t.code,
+            name: t.name,
+            score: `${t.wins}-${t.losses}`
+        })),
+        // All teams with positions for bracket visualization
+        allTeams: Object.values(state.teams).map(t => ({
+            code: t.code,
+            wins: t.wins,
+            losses: t.losses,
+            qualified: t.qualified,
+            eliminated: t.eliminated
+        })),
+        // Match history for path reconstruction
+        matchHistory: Object.entries(state.matches)
+            .filter(([, m]) => m.winner)
+            .map(([id, m]) => ({
+                pool: m.pool,
+                team1: state.teams[m.team1].code,
+                team2: state.teams[m.team2].code,
+                winner: state.teams[m.winner].code
+            }))
+    };
+
+    // Debug: log what we're saving
+    console.log('=== SAVING PREDICTION ===');
+    console.log('matchHistory length:', predictionData.matchHistory?.length);
+    console.log('matchHistory:', predictionData.matchHistory);
+    console.log('allTeams:', predictionData.allTeams?.map(t => `${t.code}: ${t.wins}-${t.losses}`));
+
+    db.collection('predictions').add(predictionData)
+        .then(() => {
+            console.log('Prediction saved!');
+        })
+        .catch(err => {
+            console.error('Error saving:', err);
+        });
+};
+
+// --- Auto-Save Hook ---
+const _originalCheck = window.checkAutoAdvance;
+window.checkAutoAdvance = function () {
+    if (_originalCheck) _originalCheck();
+
+    if (isTournamentComplete() && !state.saved) {
+        state.saved = true;
+        // Open modal instead of silent save
+        setTimeout(openSaveModal, 500);
+    }
+};
+
