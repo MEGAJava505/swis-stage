@@ -1,5 +1,7 @@
 # Admin panel - keep local only
 admin.html
+wildcard.html
+swiss.html
 
 # Firebase setup instructions
 FIREBASE_SETUP.md
