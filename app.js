@@ -42,11 +42,341 @@ const STAGES = ['1', '2', '3', '4', '5', 'final'];
 
 let state = { teams: {}, matches: {}, currentStage: '1' };
 
+// ===== Wild Card Teams =====
+const WC_TEAMS_A = [
+    { id: 'bgt', code: 'BGT', name: 'Boostgate', logo: 'img/Boostgate_Esports_allmode.png' },
+    { id: 'leon', code: 'LEON', name: 'Leon Esports', logo: 'img/Leon_Esports_allmode.png' },
+    { id: 'zone', code: 'ZONE', name: 'Team Zone', logo: 'img/Team_Zone_darkmode.png' },
+    { id: 'zeta', code: 'ZETA', name: 'ZETA DIVISION', logo: 'img/ZETA_DIVISION_darkmode.png' }
+];
+
+const WC_TEAMS_B = [
+    { id: 'axe', code: 'AXE', name: 'Axe Esports', logo: 'img/Axe_2023.png' },
+    { id: 'gzg', code: 'GZG', name: 'Guangzhou', logo: 'img/Guangzhou_Gaming_allmode.png' },
+    { id: 'rlg', code: 'RLG', name: 'RLG SE', logo: 'img/72px-Radiance_Legend_Gaming_China_logo_allmode.png' },
+    { id: 'vp', code: 'VP', name: 'Virtus.pro', logo: 'img/Virtus.pro_2019_allmode.png' }
+];
+
+const WC_GROUP_MATCHES = {
+    A: [
+        { day: 1, team1: 'zone', team2: 'zeta' }, { day: 1, team1: 'bgt', team2: 'leon' },
+        { day: 2, team1: 'leon', team2: 'zeta' }, { day: 2, team1: 'bgt', team2: 'zone' },
+        { day: 3, team1: 'zone', team2: 'leon' }, { day: 3, team1: 'bgt', team2: 'zeta' }
+    ],
+    B: [
+        { day: 1, team1: 'gzg', team2: 'axe' }, { day: 1, team1: 'vp', team2: 'rlg' },
+        { day: 2, team1: 'gzg', team2: 'rlg' }, { day: 2, team1: 'vp', team2: 'axe' },
+        { day: 3, team1: 'axe', team2: 'rlg' }, { day: 3, team1: 'gzg', team2: 'vp' }
+    ]
+};
+
+// Wild Card State
+let wcState = {
+    groupA: {},
+    groupB: {},
+    matchesA: [],
+    matchesB: [],
+    playoffs: { match1: null, match2: null },
+    winners: []
+};
+
+let currentMode = null; // 'wildcard' or 'swiss'
+
 // ===== Initialize =====
 function init() {
+    setupModeSelection();
+    initTimers();
+}
+
+function setupModeSelection() {
+    document.getElementById('startWildcardBtn').addEventListener('click', () => startMode('wildcard'));
+    document.getElementById('startSwissBtn').addEventListener('click', () => startMode('swiss'));
+
+    // Mode switch button handler
+    const modeSwitchBtn = document.getElementById('modeSwitchBtn');
+    if (modeSwitchBtn) {
+        modeSwitchBtn.addEventListener('click', switchMode);
+    }
+
+    // Reset button handler
+    const resetBtn = document.getElementById('resetBtn');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', resetAll);
+    }
+}
+
+function resetAll() {
+    if (currentMode === 'wildcard') {
+        initWildCard();
+    } else {
+        resetTournament();
+        renderAllPools();
+        renderMinimap();
+    }
+}
+
+function switchMode() {
+    const wcSection = document.getElementById('wildcardSection');
+    const swissBracket = document.getElementById('swissBracket');
+    const minimap = document.getElementById('mobileMinimap');
+    const mobileStage = document.getElementById('mobileActiveStage');
+
+    if (currentMode === 'wildcard') {
+        // Switch to Swiss
+        wcSection.classList.add('hidden');
+        swissBracket.classList.remove('hidden');
+        if (minimap) minimap.classList.remove('hidden');
+        if (mobileStage) mobileStage.classList.remove('hidden');
+        currentMode = 'swiss';
+        resetTournament();
+        setupEventListeners();
+    } else {
+        // Switch to Wild Card
+        swissBracket.classList.add('hidden');
+        wcSection.classList.remove('hidden');
+        wcSection.classList.remove('completed');
+        if (minimap) minimap.classList.add('hidden');
+        if (mobileStage) mobileStage.classList.add('hidden');
+        currentMode = 'wildcard';
+        initWildCard();
+    }
+}
+
+function startMode(mode) {
+    currentMode = mode;
+    document.getElementById('modeSelection').classList.add('hidden');
+    document.getElementById('mainApp').classList.remove('hidden');
+
+    const minimap = document.getElementById('mobileMinimap');
+    const mobileStage = document.getElementById('mobileActiveStage');
+
+    if (mode === 'wildcard') {
+        // Show Wild Card, hide Swiss bracket and mobile elements
+        document.getElementById('wildcardSection').classList.remove('hidden');
+        document.getElementById('swissBracket').classList.add('hidden');
+        if (minimap) minimap.classList.add('hidden');
+        if (mobileStage) mobileStage.classList.add('hidden');
+        initWildCard();
+    } else {
+        // Swiss mode with default VP and AXE as winners
+        document.getElementById('wildcardSection').classList.add('hidden');
+        document.getElementById('swissBracket').classList.remove('hidden');
+        if (minimap) minimap.classList.remove('hidden');
+        if (mobileStage) mobileStage.classList.remove('hidden');
+        resetTournament();
+        setupEventListeners();
+    }
+}
+
+// ===== Wild Card Functions =====
+function initWildCard() {
+    resetWcState();
+    renderWcAll();
+    setupWcEventListeners();
+}
+
+function resetWcState() {
+    wcState.groupA = {};
+    wcState.groupB = {};
+    WC_TEAMS_A.forEach(t => { wcState.groupA[t.id] = { ...t, matchWins: 0, matchLosses: 0, gameWins: 0, gameLosses: 0 }; });
+    WC_TEAMS_B.forEach(t => { wcState.groupB[t.id] = { ...t, matchWins: 0, matchLosses: 0, gameWins: 0, gameLosses: 0 }; });
+    wcState.matchesA = WC_GROUP_MATCHES.A.map((m, i) => ({ id: `a-${i}`, ...m, winner: null }));
+    wcState.matchesB = WC_GROUP_MATCHES.B.map((m, i) => ({ id: `b-${i}`, ...m, winner: null }));
+    wcState.playoffs = { match1: null, match2: null };
+    wcState.winners = [];
+}
+
+function getWcTeam(id, group) {
+    return group === 'A' ? wcState.groupA[id] : wcState.groupB[id];
+}
+
+function getWcStandings(group) {
+    const teams = Object.values(group === 'A' ? wcState.groupA : wcState.groupB);
+    return teams.sort((a, b) => {
+        if (b.matchWins !== a.matchWins) return b.matchWins - a.matchWins;
+        const diffA = a.gameWins - a.gameLosses, diffB = b.gameWins - b.gameLosses;
+        return diffB !== diffA ? diffB - diffA : b.gameWins - a.gameWins;
+    });
+}
+
+function selectWcGroupWinner(matchId, winnerId, group) {
+    const matches = group === 'A' ? wcState.matchesA : wcState.matchesB;
+    const match = matches.find(m => m.id === matchId);
+    if (!match || match.winner) return;
+
+    match.winner = winnerId;
+    const loserId = match.team1 === winnerId ? match.team2 : match.team1;
+    const winner = getWcTeam(winnerId, group), loser = getWcTeam(loserId, group);
+    winner.matchWins++; winner.gameWins += 2;
+    loser.matchLosses++; loser.gameLosses += 2;
+
+    renderWcAll();
+    checkWcPlayoffs();
+}
+
+function checkWcPlayoffs() {
+    const allADone = wcState.matchesA.every(m => m.winner);
+    const allBDone = wcState.matchesB.every(m => m.winner);
+    if (allADone && allBDone) renderWcPlayoffs();
+}
+
+function selectWcPlayoffWinner(matchNum, winnerId) {
+    wcState.playoffs[`match${matchNum}`] = winnerId;
+    renderWcPlayoffs();
+    updateWcResults();
+}
+
+function updateWcResults() {
+    const winners = [];
+    if (wcState.playoffs.match1) winners.push(wcState.playoffs.match1);
+    if (wcState.playoffs.match2) winners.push(wcState.playoffs.match2);
+
+    wcState.winners = winners;
+
+    const qualEl = document.getElementById('wcQualified');
+    const elimEl = document.getElementById('wcEliminated');
+
+    if (winners.length === 2) {
+        const allTeams = { ...wcState.groupA, ...wcState.groupB };
+        qualEl.innerHTML = winners.map(id => allTeams[id]?.code || id).join(', ');
+
+        // Get eliminated (losers of playoffs)
+        const standingsA = getWcStandings('A'), standingsB = getWcStandings('B');
+        const playoffTeams = [standingsA[0].id, standingsA[1].id, standingsB[0].id, standingsB[1].id];
+        const eliminated = playoffTeams.filter(id => !winners.includes(id));
+        elimEl.innerHTML = eliminated.map(id => allTeams[id]?.code || id).join(', ');
+
+        // Show continue button
+        document.getElementById('continueToSwissBtn').classList.remove('hidden');
+    }
+}
+
+function continueToSwiss() {
+    if (wcState.winners.length !== 2) return;
+
+    const allWcTeams = { ...wcState.groupA, ...wcState.groupB };
+    const winner1 = allWcTeams[wcState.winners[0]];
+    const winner2 = allWcTeams[wcState.winners[1]];
+
+    // Update WC1 and WC2 in Swiss Stage TEAMS
+    const wc1 = TEAMS.find(t => t.id === 'wc1');
+    const wc2 = TEAMS.find(t => t.id === 'wc2');
+    if (wc1 && winner1) { wc1.code = winner1.code; wc1.name = winner1.name; wc1.logo = winner1.logo; }
+    if (wc2 && winner2) { wc2.code = winner2.code; wc2.name = winner2.name; wc2.logo = winner2.logo; }
+
+    // Mark WC as completed (greyed out), show Swiss bracket
+    document.getElementById('wildcardSection').classList.add('completed');
+    document.getElementById('continueToSwissBtn').classList.add('hidden');
+    document.getElementById('swissBracket').classList.remove('hidden');
+
+    // Init Swiss Stage
     resetTournament();
     setupEventListeners();
 }
+
+function renderWcAll() {
+    renderWcStandings('A'); renderWcStandings('B');
+    renderWcMatches('A'); renderWcMatches('B');
+}
+
+function renderWcStandings(group) {
+    const standings = getWcStandings(group);
+    const tbody = document.querySelector(`#wcStandings${group} tbody`);
+    tbody.innerHTML = standings.map((t, i) => {
+        const rowClass = i < 2 ? 'qualified' : 'eliminated';
+        return `<tr class="${rowClass}">
+            <td>${i + 1}</td>
+            <td><div class="team-cell"><img src="${t.logo}" width="20">${t.code}</div></td>
+            <td>${t.matchWins}-${t.matchLosses}</td>
+        </tr>`;
+    }).join('');
+}
+
+function renderWcMatches(group) {
+    const matches = group === 'A' ? wcState.matchesA : wcState.matchesB;
+    const container = document.getElementById(`wcMatches${group}`);
+    container.innerHTML = matches.map(m => {
+        const t1 = getWcTeam(m.team1, group), t2 = getWcTeam(m.team2, group);
+        const t1Class = m.winner === m.team1 ? 'winner' : m.winner === m.team2 ? 'loser' : '';
+        const t2Class = m.winner === m.team2 ? 'winner' : m.winner === m.team1 ? 'loser' : '';
+        const disabled = m.winner ? 'disabled' : '';
+        return `<div class="wc-match-row">
+            <div class="wc-match-team ${t1Class} ${disabled}" data-match="${m.id}" data-team="${m.team1}" data-group="${group}"><img src="${t1.logo}">${t1.code}</div>
+            <span class="wc-match-vs">vs</span>
+            <div class="wc-match-team ${t2Class} ${disabled}" data-match="${m.id}" data-team="${m.team2}" data-group="${group}"><img src="${t2.logo}">${t2.code}</div>
+        </div>`;
+    }).join('');
+
+    container.querySelectorAll('.wc-match-team:not(.disabled)').forEach(el => {
+        el.addEventListener('click', () => selectWcGroupWinner(el.dataset.match, el.dataset.team, el.dataset.group));
+    });
+}
+
+function renderWcPlayoffs() {
+    const standingsA = getWcStandings('A'), standingsB = getWcStandings('B');
+    renderWcPlayoffMatch(1, standingsA[0], standingsB[1]);
+    renderWcPlayoffMatch(2, standingsB[0], standingsA[1]);
+}
+
+function renderWcPlayoffMatch(num, team1, team2) {
+    const container = document.querySelector(`#wcPlayoff${num} .wc-playoff-content`);
+    if (!team1 || !team2) { container.innerHTML = '<span style="color:#666;">Ожидание...</span>'; return; }
+
+    const winner = wcState.playoffs[`match${num}`];
+    const t1Class = winner === team1.id ? 'winner' : winner === team2.id ? 'loser' : '';
+    const t2Class = winner === team2.id ? 'winner' : winner === team1.id ? 'loser' : '';
+    const disabled = winner ? 'disabled' : '';
+
+    container.innerHTML = `<div class="wc-match-row">
+        <div class="wc-match-team ${t1Class} ${disabled}" data-playoff="${num}" data-team="${team1.id}"><img src="${team1.logo}">${team1.code}</div>
+        <span class="wc-match-vs">vs</span>
+        <div class="wc-match-team ${t2Class} ${disabled}" data-playoff="${num}" data-team="${team2.id}"><img src="${team2.logo}">${team2.code}</div>
+    </div>`;
+
+    container.querySelectorAll('.wc-match-team:not(.disabled)').forEach(el => {
+        el.addEventListener('click', () => selectWcPlayoffWinner(parseInt(el.dataset.playoff), el.dataset.team));
+    });
+}
+
+function setupWcEventListeners() {
+    document.getElementById('continueToSwissBtn').addEventListener('click', continueToSwiss);
+}
+
+
+// ===== Countdown Timers =====
+const WILDCARD_DATE = new Date('2026-01-03T00:00:00+05:00');
+const SWISS_DATE = new Date('2026-01-10T00:00:00+05:00');
+
+function initTimers() {
+    updateTimers();
+    setInterval(updateTimers, 1000);
+}
+
+function updateTimers() {
+    updateTimer('wcTimer', WILDCARD_DATE);
+    updateTimer('swissTimer', SWISS_DATE);
+}
+
+function updateTimer(elementId, targetDate) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+
+    const now = new Date();
+    const diff = targetDate - now;
+
+    if (diff <= 0) {
+        el.textContent = '🎉 LIVE!';
+        el.style.color = '#22c55e';
+        return;
+    }
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+    el.textContent = `${days}д ${hours}ч ${minutes}м`;
+}
+
 
 function resetTournament() {
     state.teams = {};
@@ -1227,3 +1557,5 @@ window.checkAutoAdvance = function () {
     }
 };
 
+// Initialize on page load
+init();

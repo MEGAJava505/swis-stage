@@ -11,7 +11,27 @@
 </head>
 
 <body>
-    <div class="app">
+    <!-- Mode Selection Overlay -->
+    <div id="modeSelection" class="mode-selection-overlay">
+        <div class="mode-selection-content">
+            <h1>🏆 M7 PREDICTOR</h1>
+            <p>Выберите с чего начать:</p>
+            <div class="mode-buttons">
+                <button id="startWildcardBtn" class="mode-btn wildcard">
+                    <span class="mode-icon">🃏</span>
+                    <span class="mode-title">WILD CARD</span>
+                    <span class="mode-desc">Начать с Wild Card → потом Swiss Stage</span>
+                </button>
+                <button id="startSwissBtn" class="mode-btn swiss">
+                    <span class="mode-icon">🏆</span>
+                    <span class="mode-title">SWISS STAGE</span>
+                    <span class="mode-desc">Сразу Swiss Stage (VP и AXE по умолчанию)</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="app hidden" id="mainApp">
         <!-- Header -->
         <header class="header">
             <div class="logo-badge">
@@ -19,6 +39,18 @@
                 <span class="logo-sub">WORLD CHAMPIONSHIP</span>
             </div>
             <h1 class="main-title">ФОРМАТ <span class="cyan">ШВЕЙЦАРКИ</span></h1>
+            <div class="header-timers">
+                <div class="timer-card wildcard">
+                    <span class="timer-icon">🃏</span>
+                    <span class="timer-name">WC</span>
+                    <span class="timer-countdown" id="wcTimer">--д --ч --м</span>
+                </div>
+                <div class="timer-card swiss">
+                    <span class="timer-icon">🏆</span>
+                    <span class="timer-name">Swiss</span>
+                    <span class="timer-countdown" id="swissTimer">--д --ч --м</span>
+                </div>
+            </div>
             <p class="wc-note">* WC1 и WC2 поставлены условно</p>
         </header>
 
@@ -31,7 +63,86 @@
             <button id="swapWcBtn" class="btn btn-swap">� WC1↔WC2</button>
 
             <button id="setupBtn" class="btn btn-setup">⚙️</button>
-            <button id="mobileTestBtn" class="btn btn-mobile">📱 Мобильная версия</button>
+            <button id="modeSwitchBtn" class="btn btn-mode">🔀 Режим</button>
+        </div>
+
+        <!-- Wild Card Section (hidden by default) -->
+        <div id="wildcardSection" class="wildcard-section hidden">
+            <div class="wc-header">
+                <h2>🃏 WILD CARD STAGE</h2>
+            </div>
+            <div class="wc-content">
+                <!-- Groups Column (A above B) -->
+                <div class="wc-groups-column">
+                    <!-- Group A -->
+                    <div class="wc-group-box group-a">
+                        <div class="wc-group-header">
+                            <h3>🔮 ГРУППА A</h3>
+                        </div>
+                        <div class="wc-group-content">
+                            <table class="wc-standings" id="wcStandingsA">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Команда</th>
+                                        <th>М</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                            <div id="wcMatchesA" class="wc-matches"></div>
+                        </div>
+                    </div>
+                    <!-- Group B -->
+                    <div class="wc-group-box group-b">
+                        <div class="wc-group-header">
+                            <h3>💎 ГРУППА B</h3>
+                        </div>
+                        <div class="wc-group-content">
+                            <table class="wc-standings" id="wcStandingsB">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Команда</th>
+                                        <th>М</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                            <div id="wcMatchesB" class="wc-matches"></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Final Column: Playoffs + Results -->
+                <div class="wc-final-column">
+                    <div class="wc-playoffs">
+                        <div class="wc-playoffs-header">
+                            <h3>ПЛЕЙ-ОФФ</h3>
+                        </div>
+                        <div class="wc-playoffs-matches">
+                            <div class="wc-playoff-match" id="wcPlayoff1">
+                                <h4>A1 vs B2</h4>
+                                <div class="wc-playoff-content"></div>
+                            </div>
+                            <div class="wc-playoff-match" id="wcPlayoff2">
+                                <h4>B1 vs A2</h4>
+                                <div class="wc-playoff-content"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="wc-results">
+                        <div class="wc-result-box qualified">
+                            <h4>✅</h4>
+                            <div id="wcQualified" class="wc-result-teams">—</div>
+                        </div>
+                        <div class="wc-result-box eliminated">
+                            <h4>❌</h4>
+                            <div id="wcEliminated" class="wc-result-teams">—</div>
+                        </div>
+                    </div>
+                    <button id="continueToSwissBtn" class="btn btn-continue hidden">▶ Продолжить</button>
+                </div>
+            </div>
         </div>
 
         <!-- Mobile Minimap (shows full bracket structure miniaturized) -->
@@ -121,7 +232,7 @@
         </div>
 
         <!-- Desktop Bracket -->
-        <div class="bracket-container">
+        <div class="bracket-container" id="swissBracket">
             <div class="bracket">
                 <!-- ЭТАП 1 -->
                 <div class="stage" data-stage="1">
