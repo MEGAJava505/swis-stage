@@ -99,6 +99,8 @@ function setupEventListeners() {
     if (mobileTestBtn) {
         mobileTestBtn.addEventListener('click', () => {
             document.body.classList.toggle('mobile-test');
+            const isMobile = document.body.classList.contains('mobile-test');
+            mobileTestBtn.textContent = isMobile ? '🖥️ ПК версия' : '📱 Мобильная версия';
             renderMobileStage();
         });
     }
@@ -184,7 +186,11 @@ function renderMobileStage() {
         html += renderMobileResult(r.score, r.type);
     });
 
-    // Render pools
+    // Start horizontal layout container (pools on left, flow connector on right)
+    html += `<div class="mobile-stage-row">`;
+
+    // Left side: pools
+    html += `<div class="mobile-pools-column">`;
     pools.forEach(pool => {
         const matches = Object.entries(state.matches).filter(([, m]) => m.pool === pool).map(([id, m]) => ({ id, ...m }));
         const poolClass = pool.startsWith('2') || pool === '1-0' ? 'winners' : pool.endsWith('2') || pool === '0-1' ? 'losers' : '';
@@ -201,6 +207,12 @@ function renderMobileStage() {
             </div>
         `;
     });
+    html += `</div>`;
+
+    // Right side: flow connector
+    html += renderMobileFlowConnector();
+
+    html += `</div>`; // Close mobile-stage-row
 
     // Render eliminated results (at bottom)
     results.filter(r => r.type === 'eliminated').forEach(r => {
@@ -213,6 +225,94 @@ function renderMobileStage() {
     container.querySelectorAll('.match-team:not(.disabled)').forEach(el => {
         el.addEventListener('click', () => selectWinner(el.dataset.match, el.dataset.team));
     });
+}
+
+// Render mobile flow connector showing team transitions
+// Uses same structure as desktop flow connectors
+function renderMobileFlowConnector() {
+    const transitions = {
+        '1': { src: ['0-0'], destW: '1-0', destL: '0-1' },
+        '2': { src: ['1-0', '0-1'], destW: '2-0/1-1', destL: '1-1/0-2' },
+        '3': { src: ['2-0', '1-1', '0-2'], destW: '3-0/2-1/1-2', destL: '2-1/1-2/0-3' },
+        '4': { src: ['2-1', '1-2'], destW: '3-1/2-2', destL: '2-2/1-3' },
+        '5': { src: ['2-2'], destW: '3-2', destL: '2-3' }
+    };
+
+    const trans = transitions[state.currentStage];
+    if (!trans) return '';
+
+    // Get decided matches from current stage pools - same logic as desktop
+    const decidedMatches = Object.values(state.matches).filter(m => trans.src.includes(m.pool) && m.winner);
+
+    if (decidedMatches.length === 0) return '';
+
+    // Group by source pool (same as desktop renderFlowTeamIcons)
+    const poolGroups = {};
+    trans.src.forEach(pool => {
+        poolGroups[pool] = { winners: [], losers: [] };
+    });
+
+    decidedMatches.forEach(m => {
+        const winnerTeam = state.teams[m.winner];
+        const loserId = m.team1 === m.winner ? m.team2 : m.team1;
+        const loserTeam = state.teams[loserId];
+
+        if (poolGroups[m.pool]) {
+            if (winnerTeam) {
+                poolGroups[m.pool].winners.push(winnerTeam);
+            }
+            if (loserTeam) {
+                poolGroups[m.pool].losers.push(loserTeam);
+            }
+        }
+    });
+
+    // Check if there's anything to show
+    const hasTeams = Object.values(poolGroups).some(g => g.winners.length > 0 || g.losers.length > 0);
+    if (!hasTeams) return '';
+
+    // Sort pools (same as desktop)
+    const sortedPools = [...trans.src].sort((a, b) => {
+        const [winsA, lossesA] = a.split('-').map(Number);
+        const [winsB, lossesB] = b.split('-').map(Number);
+        return (winsB - lossesB) - (winsA - lossesA);
+    });
+
+    // Build HTML using same structure as desktop flow connectors
+    let flowHtml = '';
+    sortedPools.forEach(pool => {
+        const group = poolGroups[pool];
+        if (group.winners.length > 0 || group.losers.length > 0) {
+            flowHtml += `
+                <div class="flow-pool-group">
+                    <div class="flow-bar flow-bar-winner">
+                        ${group.winners.map(t => `
+                            <div class="flow-team">
+                                <img src="${t.flag}" class="flow-flag">
+                                <img src="${t.logo}" class="flow-logo">
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="flow-bar flow-bar-loser">
+                        ${group.losers.map(t => `
+                            <div class="flow-team">
+                                <img src="${t.flag}" class="flow-flag">
+                                <img src="${t.logo}" class="flow-logo">
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+    });
+
+    return `
+        <div class="mobile-flow-container">
+            <div class="flow-connector active">
+                ${flowHtml}
+            </div>
+        </div>
+    `;
 }
 
 function renderFullResults() {
