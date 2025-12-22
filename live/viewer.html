@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M7 Predictor - Live Viewer</title>
+    <link rel="stylesheet" href="../styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Roboto:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <style>
+        /* Viewer-specific styles */
+        .prediction-status {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            font-size: 0.7rem;
+            padding: 0.15rem 0.3rem;
+            border-radius: 3px;
+            font-weight: 600;
+        }
+
+        .prediction-status.correct {
+            background: rgba(34, 197, 94, 0.3);
+            color: #22c55e;
+        }
+
+        .prediction-status.incorrect {
+            background: rgba(220, 38, 38, 0.3);
+            color: #dc2626;
+        }
+
+        .prediction-status.pending {
+            background: rgba(234, 179, 8, 0.3);
+            color: #eab308;
+        }
+
+        .match-row {
+            position: relative;
+        }
+
+        .locked-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gold);
+            font-size: 0.8rem;
+            font-weight: 600;
+            border-radius: 6px;
+        }
+
+        .live-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            color: white;
+            padding: 0.25rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            animation: pulse 2s infinite;
+        }
+
+        .live-badge::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: white;
+            border-radius: 50%;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .sync-status {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            z-index: 1000;
+        }
+
+        .sync-status.connected {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+            border: 1px solid #22c55e;
+        }
+
+        .sync-status.disconnected {
+            background: rgba(220, 38, 38, 0.2);
+            color: #dc2626;
+            border: 1px solid #dc2626;
+        }
+
+        .official-result {
+            background: linear-gradient(135deg, rgba(184, 157, 42, 0.1), transparent);
+            border: 2px solid var(--gold) !important;
+        }
+
+        .official-result .match-team.winner {
+            background: rgba(34, 197, 94, 0.3);
+            border-color: #22c55e;
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 1rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-pool);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.85rem;
+        }
+
+        .stat-item .label {
+            color: var(--text-dim);
+        }
+
+        .stat-item .value {
+            font-weight: 600;
+            color: var(--cyan);
+        }
+
+        .stat-item .value.green {
+            color: #22c55e;
+        }
+
+        .stat-item .value.red {
+            color: #dc2626;
+        }
+
+        .stat-item .value.yellow {
+            color: #eab308;
+        }
+
+        /* Official result when user didn't vote - different color scheme */
+        .official-only {
+            background: linear-gradient(135deg, rgba(0, 200, 212, 0.15), transparent) !important;
+            border: 2px solid var(--cyan) !important;
+        }
+
+        .official-only .match-team.official-winner {
+            background: rgba(0, 200, 212, 0.3) !important;
+            border-color: var(--cyan) !important;
+        }
+
+        .official-only .match-team.official-loser {
+            opacity: 0.4;
+        }
+
+        .official-badge {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            font-size: 0.6rem;
+            padding: 0.1rem 0.25rem;
+            border-radius: 3px;
+            background: var(--cyan);
+            color: #000;
+            font-weight: 700;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Mode Selection Overlay -->
+    <div id="modeSelection" class="mode-selection-overlay">
+        <div class="mode-selection-content">
+            <h1>🏆 M7 PREDICTOR</h1>
+            <p>Выберите с чего начать:</p>
+            <div class="mode-buttons">
+                <button id="startWildcardBtn" class="mode-btn wildcard">
+                    <span class="mode-icon">🃏</span>
+                    <span class="mode-title">WILD CARD</span>
+                    <span class="mode-desc">Начать с Wild Card → потом Swiss Stage</span>
+                </button>
+                <button id="startSwissBtn" class="mode-btn swiss">
+                    <span class="mode-icon">🏆</span>
+                    <span class="mode-title">SWISS STAGE</span>
+                    <span class="mode-desc">Сразу Swiss Stage (VP и AXE по умолчанию)</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="app hidden" id="mainApp">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo-badge">
+                <span class="logo-m7">M7</span>
+                <span class="logo-sub">LIVE VIEWER</span>
+            </div>
+            <h1 class="main-title">ФОРМАТ <span class="cyan">ШВЕЙЦАРКИ</span></h1>
+            <div class="header-timers">
+                <div class="timer-card wildcard">
+                    <span class="timer-icon">🃏</span>
+                    <span class="timer-name">WC</span>
+                    <span class="timer-countdown" id="wcTimer">--д --ч --м</span>
+                </div>
+                <div class="timer-card swiss">
+                    <span class="timer-icon">🏆</span>
+                    <span class="timer-name">Swiss</span>
+                    <span class="timer-countdown" id="swissTimer">--д --ч --м</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Stats Bar -->
+        <div class="stats-bar">
+            <div class="stat-item">
+                <span class="label">✅ Угадано:</span>
+                <span class="value green" id="correctCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="label">❌ Не угадано:</span>
+                <span class="value red" id="incorrectCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="label">⏳ Ожидание:</span>
+                <span class="value yellow" id="pendingCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="label">📊 Точность:</span>
+                <span class="value" id="accuracyPercent">—</span>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <button id="resetBtn" class="btn btn-reset">🔄 Сбросить</button>
+            <button id="saveBtn" class="btn btn-save">💾</button>
+            <input type="text" id="nickInput" class="nick-input" placeholder="Напишите ник..." maxlength="15">
+            <button id="modeSwitchBtn" class="btn btn-mode">🔀 Режим</button>
+        </div>
+
+        <!-- Wild Card Section (hidden by default) -->
+        <div id="wildcardSection" class="wildcard-section hidden">
+            <div class="wc-header">
+                <h2>🃏 WILD CARD STAGE</h2>
+            </div>
+            <div class="wc-content">
+                <!-- Groups Column (A above B) -->
+                <div class="wc-groups-column">
+                    <!-- Group A -->
+                    <div class="wc-group-box group-a">
+                        <div class="wc-group-header">
+                            <h3>🔮 ГРУППА A</h3>
+                        </div>
+                        <div class="wc-group-content">
+                            <table class="wc-standings" id="wcStandingsA">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Команда</th>
+                                        <th>М</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                            <div id="wcMatchesA" class="wc-matches"></div>
+                        </div>
+                    </div>
+                    <!-- Group B -->
+                    <div class="wc-group-box group-b">
+                        <div class="wc-group-header">
+                            <h3>💎 ГРУППА B</h3>
+                        </div>
+                        <div class="wc-group-content">
+                            <table class="wc-standings" id="wcStandingsB">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Команда</th>
+                                        <th>М</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                            <div id="wcMatchesB" class="wc-matches"></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Final Column: Playoffs + Results -->
+                <div class="wc-final-column">
+                    <div class="wc-playoffs">
+                        <div class="wc-playoffs-header">
+                            <h3>ПЛЕЙ-ОФФ</h3>
+                        </div>
+                        <div class="wc-playoffs-matches">
+                            <div class="wc-playoff-match" id="wcPlayoff1">
+                                <h4>A1 vs B2</h4>
+                                <div class="wc-playoff-content"></div>
+                            </div>
+                            <div class="wc-playoff-match" id="wcPlayoff2">
+                                <h4>B1 vs A2</h4>
+                                <div class="wc-playoff-content"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="wc-results">
+                        <div class="wc-result-box qualified">
+                            <h4>✅</h4>
+                            <div id="wcQualified" class="wc-result-teams">—</div>
+                        </div>
+                        <div class="wc-result-box eliminated">
+                            <h4>❌</h4>
+                            <div id="wcEliminated" class="wc-result-teams">—</div>
+                        </div>
+                    </div>
+                    <button id="continueToSwissBtn" class="btn btn-continue hidden">▶ Продолжить</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Minimap -->
+        <div class="mobile-minimap" id="mobileMinimap">
+            <div class="minimap-bracket">
+                <!-- Stage 1 -->
+                <div class="mini-stage" data-stage="1">
+                    <div class="mini-pool" data-pool="0-0">0-0</div>
+                    <div class="mini-footer">ЭТАП 1</div>
+                </div>
+                <div class="flow-connector mobile-flow" id="mob-conn-2"></div>
+                <!-- Stage 2 -->
+                <div class="mini-stage" data-stage="2">
+                    <div class="mini-pool winners" data-pool="1-0">1-0</div>
+                    <div class="mini-pool losers" data-pool="0-1">0-1</div>
+                    <div class="mini-footer">ЭТАП 2</div>
+                </div>
+                <div class="flow-connector mobile-flow" id="mob-conn-3"></div>
+                <!-- Stage 3 -->
+                <div class="mini-stage" data-stage="3">
+                    <div class="mini-pool winners" data-pool="2-0">2-0</div>
+                    <div class="mini-pool" data-pool="1-1">1-1</div>
+                    <div class="mini-pool losers" data-pool="0-2">0-2</div>
+                    <div class="mini-footer">ЭТАП 3</div>
+                </div>
+                <div class="flow-connector mobile-flow" id="mob-conn-4"></div>
+                <!-- Stage 4 -->
+                <div class="mini-stage" data-stage="4">
+                    <div class="mini-result qualified">3-0</div>
+                    <div class="mini-pool winners" data-pool="2-1">2-1</div>
+                    <div class="mini-pool losers" data-pool="1-2">1-2</div>
+                    <div class="mini-result eliminated">0-3</div>
+                    <div class="mini-footer">ЭТАП 4</div>
+                </div>
+                <div class="flow-connector mobile-flow" id="mob-conn-5"></div>
+                <!-- Stage 5 -->
+                <div class="mini-stage" data-stage="5">
+                    <div class="mini-result qualified">3-1</div>
+                    <div class="mini-pool" data-pool="2-2">2-2</div>
+                    <div class="mini-result eliminated">1-3</div>
+                    <div class="mini-footer">ЭТАП 5</div>
+                </div>
+                <div class="flow-connector mobile-flow" id="mob-conn-final"></div>
+                <!-- Final -->
+                <div class="mini-stage" data-stage="final">
+                    <div class="mini-result qualified">3-2</div>
+                    <div class="mini-result eliminated">2-3</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Active Stage -->
+        <div class="mobile-active-stage" id="mobileActiveStage">
+            <div class="active-stage-header">
+                <span class="active-stage-title" id="activeStageTitle">ЭТАП 1</span>
+                <div class="stage-nav">
+                    <button class="nav-btn" id="prevStage">◀</button>
+                    <button class="nav-btn" id="nextStage">▶</button>
+                </div>
+            </div>
+            <div class="active-stage-content" id="activeStageContent">
+                <!-- Pools rendered here -->
+            </div>
+        </div>
+
+        <!-- Desktop Bracket -->
+        <div class="bracket-container" id="swissBracket">
+            <div class="bracket">
+                <!-- ЭТАП 1 -->
+                <div class="stage" data-stage="1">
+                    <div class="pool-box">
+                        <div class="pool-title"><span class="pool-score">0-0</span></div>
+                        <div class="pool-format">BO1, 8 BO1 В ОБЩЕМ</div>
+                        <div class="matches-list" id="matches-0-0"></div>
+                    </div>
+                    <div class="stage-footer">
+                        <div class="stage-name">ЭТАП 1</div>
+                        <div class="stage-date">10 янв, 2026</div>
+                    </div>
+                </div>
+
+                <div class="flow-connector" id="conn-1"></div>
+                <!-- ЭТАП 2 -->
+                <div class="stage" data-stage="2">
+                    <div class="pool-box pool-winners">
+                        <div class="pool-title"><span class="pool-score">1-0</span></div>
+                        <div class="pool-format">BO1</div>
+                        <div class="matches-list" id="matches-1-0"></div>
+                    </div>
+                    <div class="pool-box pool-losers">
+                        <div class="pool-title"><span class="pool-score">0-1</span></div>
+                        <div class="pool-format">BO1</div>
+                        <div class="matches-list" id="matches-0-1"></div>
+                    </div>
+                    <div class="stage-footer">
+                        <div class="stage-name">ЭТАП 2</div>
+                        <div class="stage-date">11 янв</div>
+                    </div>
+                </div>
+
+                <div class="flow-connector" id="conn-2"></div>
+                <!-- ЭТАП 3 -->
+                <div class="stage" data-stage="3">
+                    <div class="pool-box pool-winners">
+                        <div class="pool-title"><span class="pool-score">2-0</span></div>
+                        <div class="pool-format">BO3</div>
+                        <div class="matches-list" id="matches-2-0"></div>
+                    </div>
+                    <div class="pool-box">
+                        <div class="pool-title"><span class="pool-score">1-1</span></div>
+                        <div class="pool-format">BO1</div>
+                        <div class="matches-list" id="matches-1-1"></div>
+                    </div>
+                    <div class="pool-box pool-losers">
+                        <div class="pool-title"><span class="pool-score">0-2</span></div>
+                        <div class="pool-format">BO3</div>
+                        <div class="matches-list" id="matches-0-2"></div>
+                    </div>
+                    <div class="stage-footer">
+                        <div class="stage-name">ЭТАП 3</div>
+                        <div class="stage-date">12-13 янв</div>
+                    </div>
+                </div>
+
+                <div class="flow-connector" id="conn-3"></div>
+                <!-- ЭТАП 4 -->
+                <div class="stage" data-stage="4">
+                    <div class="result-box qualified">
+                        <div class="result-score">3-0</div>
+                        <div class="result-text">ПЛЕЙ-ОФФ</div>
+                        <div class="result-teams" id="result-3-0"></div>
+                    </div>
+                    <div class="pool-box pool-winners">
+                        <div class="pool-title"><span class="pool-score">2-1</span></div>
+                        <div class="pool-format">BO3</div>
+                        <div class="matches-list" id="matches-2-1"></div>
+                    </div>
+                    <div class="pool-box pool-losers">
+                        <div class="pool-title"><span class="pool-score">1-2</span></div>
+                        <div class="pool-format">BO3</div>
+                        <div class="matches-list" id="matches-1-2"></div>
+                    </div>
+                    <div class="result-box eliminated">
+                        <div class="result-score">0-3</div>
+                        <div class="result-text">ВЫБЫЛИ</div>
+                        <div class="result-teams" id="result-0-3"></div>
+                    </div>
+                    <div class="stage-footer">
+                        <div class="stage-name">ЭТАП 4</div>
+                        <div class="stage-date">15-16 янв</div>
+                    </div>
+                </div>
+
+                <div class="flow-connector" id="conn-4"></div>
+                <!-- ЭТАП 5 -->
+                <div class="stage" data-stage="5">
+                    <div class="result-box qualified">
+                        <div class="result-score">3-1</div>
+                        <div class="result-text">ПЛЕЙ-ОФФ</div>
+                        <div class="result-teams" id="result-3-1"></div>
+                    </div>
+                    <div class="pool-box">
+                        <div class="pool-title"><span class="pool-score">2-2</span></div>
+                        <div class="pool-format">BO3</div>
+                        <div class="matches-list" id="matches-2-2"></div>
+                    </div>
+                    <div class="result-box eliminated">
+                        <div class="result-score">1-3</div>
+                        <div class="result-text">ВЫБЫЛИ</div>
+                        <div class="result-teams" id="result-1-3"></div>
+                    </div>
+                    <div class="stage-footer">
+                        <div class="stage-name">ЭТАП 5</div>
+                        <div class="stage-date">17 янв</div>
+                    </div>
+                </div>
+
+                <div class="flow-connector" id="conn-5"></div>
+                <!-- ФИНАЛ -->
+                <div class="stage stage-final" data-stage="final">
+                    <div class="result-box qualified">
+                        <div class="result-score">3-2</div>
+                        <div class="result-text">ПЛЕЙ-ОФФ</div>
+                        <div class="result-teams" id="result-3-2"></div>
+                    </div>
+                    <div class="spacer"></div>
+                    <div class="result-box eliminated">
+                        <div class="result-score">2-3</div>
+                        <div class="result-text">ВЫБЫЛИ</div>
+                        <div class="result-teams" id="result-2-3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer-ticker">
+            <span>M7 WORLD CHAMPIONSHIP</span>
+            <span class="ticker-sep">▸</span>
+            <span>ROAD TO JAKARTA</span>
+        </div>
+
+        <!-- Nickname Modal -->
+        <div id="nickModal" class="modal hidden">
+            <div class="modal-content">
+                <h2>🏆 Турнир завершён!</h2>
+                <p style="color: #bbb; font-size: 0.9rem; margin-bottom: 1rem;">Напишите ник и сохраните:</p>
+                <input type="text" id="nicknameInput" placeholder="Ваш ник..." maxlength="15">
+                <div class="modal-buttons">
+                    <button id="saveNickBtn" class="btn btn-trigger">💾 Сохранить</button>
+                    <button id="closeNickBtn" class="btn btn-reset">Отмена</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sync Status -->
+    <div class="sync-status connected" id="syncStatus">🔗 Подключено</div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="../firebase-config.js"></script>
+    <script src="viewer.js"></script>
+</body>
+
+</html>

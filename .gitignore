@@ -1,12 +1,8 @@
 # Admin panel - keep local only
 admin.html
-wildcard.html
-swiss.html
+live/control.html
+live/control.js
 
-# Firebase setup instructions
-FIREBASE_SETUP.md
+# Documentation
+docs/
 
-# Tier/coefficient system notes
-coff_sys.txt
-sws_stage.txt
-chaange.txt
