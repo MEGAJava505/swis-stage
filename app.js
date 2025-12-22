@@ -44,17 +44,17 @@ let state = { teams: {}, matches: {}, currentStage: '1' };
 
 // ===== Wild Card Teams =====
 const WC_TEAMS_A = [
-    { id: 'bgt', code: 'BGT', name: 'Boostgate', logo: 'img/Boostgate_Esports_allmode.png' },
-    { id: 'leon', code: 'LEON', name: 'Leon Esports', logo: 'img/Leon_Esports_allmode.png' },
-    { id: 'zone', code: 'ZONE', name: 'Team Zone', logo: 'img/Team_Zone_darkmode.png' },
-    { id: 'zeta', code: 'ZETA', name: 'ZETA DIVISION', logo: 'img/ZETA_DIVISION_darkmode.png' }
+    { id: 'bgt', code: 'BGT', name: 'Boostgate', flag: 'https://flagcdn.com/w20/tr.png', logo: 'img/Boostgate_Esports_allmode.png' },
+    { id: 'leon', code: 'LEON', name: 'Leon Esports', flag: '', logo: 'img/Leon_Esports_allmode.png' },
+    { id: 'zone', code: 'ZONE', name: 'Team Zone', flag: 'https://flagcdn.com/w20/mn.png', logo: 'img/Team_Zone_darkmode.png' },
+    { id: 'zeta', code: 'ZETA', name: 'ZETA DIVISION', flag: 'https://flagcdn.com/w20/jp.png', logo: 'img/ZETA_DIVISION_darkmode.png' }
 ];
 
 const WC_TEAMS_B = [
-    { id: 'axe', code: 'AXE', name: 'Axe Esports', logo: 'img/Axe_2023.png' },
-    { id: 'gzg', code: 'GZG', name: 'Guangzhou', logo: 'img/Guangzhou_Gaming_allmode.png' },
-    { id: 'rlg', code: 'RLG', name: 'RLG SE', logo: 'img/72px-Radiance_Legend_Gaming_China_logo_allmode.png' },
-    { id: 'vp', code: 'VP', name: 'Virtus.pro', logo: 'img/Virtus.pro_2019_allmode.png' }
+    { id: 'axe', code: 'AXE', name: 'Axe Esports', flag: 'https://flagcdn.com/w20/ae.png', logo: 'img/Axe_2023.png' },
+    { id: 'gzg', code: 'GZG', name: 'Guangzhou', flag: 'https://flagcdn.com/w20/cn.png', logo: 'img/Guangzhou_Gaming_allmode.png' },
+    { id: 'rlg', code: 'RLG', name: 'RLG SE', flag: 'https://flagcdn.com/w20/vn.png', logo: 'img/72px-Radiance_Legend_Gaming_China_logo_allmode.png' },
+    { id: 'vp', code: 'VP', name: 'Virtus.pro', flag: 'https://flagcdn.com/w20/ru.png', logo: 'img/Virtus.pro_2019_allmode.png' }
 ];
 
 const WC_GROUP_MATCHES = {
@@ -102,6 +102,29 @@ function setupModeSelection() {
     const resetBtn = document.getElementById('resetBtn');
     if (resetBtn) {
         resetBtn.addEventListener('click', resetAll);
+    }
+
+    // Swap WC1/WC2 button handler - works globally
+    const swapWcBtn = document.getElementById('swapWcBtn');
+    if (swapWcBtn) {
+        swapWcBtn.addEventListener('click', () => {
+            matchupSlots = matchupSlots.map(p => p.map(id => id === 'wc1' ? 'wc2' : id === 'wc2' ? 'wc1' : id));
+            if (currentMode === 'swiss') {
+                resetTournament();
+            }
+        });
+    }
+
+    // Setup modal button handler - works globally
+    const setupBtn = document.getElementById('setupBtn');
+    if (setupBtn) {
+        setupBtn.addEventListener('click', openSetupModal);
+    }
+
+    // Save button handler - works globally
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => savePrediction());
     }
 }
 
@@ -261,15 +284,57 @@ function continueToSwiss() {
     // Update WC1 and WC2 in Swiss Stage TEAMS
     const wc1 = TEAMS.find(t => t.id === 'wc1');
     const wc2 = TEAMS.find(t => t.id === 'wc2');
-    if (wc1 && winner1) { wc1.code = winner1.code; wc1.name = winner1.name; wc1.logo = winner1.logo; }
-    if (wc2 && winner2) { wc2.code = winner2.code; wc2.name = winner2.name; wc2.logo = winner2.logo; }
+    if (wc1 && winner1) { wc1.code = winner1.code; wc1.name = winner1.name; wc1.logo = winner1.logo; wc1.flag = winner1.flag; }
+    if (wc2 && winner2) { wc2.code = winner2.code; wc2.name = winner2.name; wc2.logo = winner2.logo; wc2.flag = winner2.flag; }
 
-    // Mark WC as completed (greyed out), show Swiss bracket
-    document.getElementById('wildcardSection').classList.add('completed');
+    // Get eliminated teams (losers of playoffs)
+    const standingsA = getWcStandings('A'), standingsB = getWcStandings('B');
+    const playoffTeams = [standingsA[0].id, standingsA[1].id, standingsB[0].id, standingsB[1].id];
+    const eliminatedIds = playoffTeams.filter(id => !wcState.winners.includes(id));
+    const eliminatedTeams = eliminatedIds.map(id => allWcTeams[id]);
+
+    // Update Wild Card Results Banner
+    const banner = document.getElementById('wcResultsBanner');
+    const bannerQualified = document.getElementById('wcBannerQualified');
+    const bannerEliminated = document.getElementById('wcBannerEliminated');
+
+    if (banner && bannerQualified && bannerEliminated) {
+        bannerQualified.textContent = [winner1?.code, winner2?.code].filter(Boolean).join(', ') || '—';
+        bannerEliminated.textContent = eliminatedTeams.map(t => t?.code).filter(Boolean).join(', ') || '—';
+        banner.classList.remove('hidden');
+    }
+
+    // Hide Wild Card section, show Swiss bracket
+    document.getElementById('wildcardSection').classList.add('hidden');
     document.getElementById('continueToSwissBtn').classList.add('hidden');
     document.getElementById('swissBracket').classList.remove('hidden');
 
+    // Show mobile elements for Swiss
+    const minimap = document.getElementById('mobileMinimap');
+    const mobileStage = document.getElementById('mobileActiveStage');
+    if (minimap) minimap.classList.remove('hidden');
+    if (mobileStage) mobileStage.classList.remove('hidden');
+
+    // Save Wild Card state to localStorage for later use in savePrediction
+    const wcDataToSave = {
+        winners: wcState.winners,
+        groupA: Object.values(wcState.groupA).map(t => ({
+            id: t.id, code: t.code, name: t.name,
+            matchWins: t.matchWins, matchLosses: t.matchLosses
+        })),
+        groupB: Object.values(wcState.groupB).map(t => ({
+            id: t.id, code: t.code, name: t.name,
+            matchWins: t.matchWins, matchLosses: t.matchLosses
+        })),
+        playoffs: wcState.playoffs,
+        eliminatedIds: eliminatedIds
+    };
+    localStorage.setItem('m7_wildcard_data', JSON.stringify(wcDataToSave));
+    console.log('✅ Wild Card data saved to localStorage:', wcDataToSave);
+    alert('Wild Card сохранён! Winners: ' + wcDataToSave.winners.join(', '));
+
     // Init Swiss Stage
+    currentMode = 'swiss';
     resetTournament();
     setupEventListeners();
 }
@@ -399,31 +464,16 @@ function resetTournament() {
 
 // ===== Event Listeners =====
 function setupEventListeners() {
-    document.getElementById('resetBtn').addEventListener('click', () => {
-        if (confirm('Сбросить?')) resetTournament();
-    });
-
-    document.getElementById('swapWcBtn').addEventListener('click', () => {
-        matchupSlots = matchupSlots.map(p => p.map(id => id === 'wc1' ? 'wc2' : id === 'wc2' ? 'wc1' : id));
-        resetTournament();
-    });
-
-    // Save button handler
-    const saveBtn = document.getElementById('saveBtn');
-    if (saveBtn) {
-        saveBtn.addEventListener('click', () => savePrediction());
-    }
+    // Setup modal apply/cancel buttons
+    document.getElementById('applySetup').addEventListener('click', applySetup);
+    document.getElementById('cancelSetup').addEventListener('click', closeSetupModal);
+    document.querySelector('.modal-overlay')?.addEventListener('click', closeSetupModal);
 
     // Shuffle button handler - reshuffles pending matchups in each pool
     const shuffleBtn = document.getElementById('shuffleBtn');
     if (shuffleBtn) {
         shuffleBtn.addEventListener('click', shufflePendingMatchups);
     }
-
-    document.getElementById('setupBtn').addEventListener('click', openSetupModal);
-    document.getElementById('applySetup').addEventListener('click', applySetup);
-    document.getElementById('cancelSetup').addEventListener('click', closeSetupModal);
-    document.querySelector('.modal-overlay')?.addEventListener('click', closeSetupModal);
 
     const mobileTestBtn = document.getElementById('mobileTestBtn');
     if (mobileTestBtn) {
@@ -616,20 +666,24 @@ function renderMobileFlowConnector() {
             flowHtml += `
                 <div class="flow-pool-group">
                     <div class="flow-bar flow-bar-winner">
-                        ${group.winners.map(t => `
+                        ${group.winners.map(t => {
+                const flag = t.flag ? `<img src="${t.flag}" class="flow-flag">` : '';
+                return `
                             <div class="flow-team">
-                                <img src="${t.flag}" class="flow-flag">
+                                ${flag}
                                 <img src="${t.logo}" class="flow-logo">
-                            </div>
-                        `).join('')}
+                            </div>`;
+            }).join('')}
                     </div>
                     <div class="flow-bar flow-bar-loser">
-                        ${group.losers.map(t => `
+                        ${group.losers.map(t => {
+                const flag = t.flag ? `<img src="${t.flag}" class="flow-flag">` : '';
+                return `
                             <div class="flow-team">
-                                <img src="${t.flag}" class="flow-flag">
+                                ${flag}
                                 <img src="${t.logo}" class="flow-logo">
-                            </div>
-                        `).join('')}
+                            </div>`;
+            }).join('')}
                     </div>
                 </div>
             `;
@@ -1070,8 +1124,9 @@ function checkAutoAdvance() {
 
 // ===== Rendering =====
 function getTeamHtml(team) {
+    const flag = team.flag ? `<img src="${team.flag}" class="team-flag">` : '';
     const logo = team.logo ? `<img src="${team.logo}" class="team-logo">` : '';
-    return `<img src="${team.flag}" class="team-flag">${logo}<span class="team-code">${team.code}${team.isWildcard ? '*' : ''}</span>`;
+    return `${flag}${logo}<span class="team-code">${team.code}${team.isWildcard ? '*' : ''}</span>`;
 }
 
 function renderAll() {
@@ -1192,6 +1247,95 @@ function isTournamentComplete() {
     return qualified === 8 && eliminated === 8;
 }
 
+// Save Wild Card prediction automatically when transitioning to Swiss
+function saveWildCardPrediction() {
+    console.log('=== saveWildCardPrediction called ===');
+    console.log('typeof db:', typeof db);
+    console.log('wcState.winners:', wcState.winners);
+
+    if (typeof db === 'undefined') {
+        console.log('Firebase not configured - skipping Wild Card save');
+        alert('Firebase не настроен! Проверьте консоль.');
+        return;
+    }
+
+    if (!wcState.winners || wcState.winners.length === 0) {
+        console.log('No Wild Card winners - skipping save');
+        return;
+    }
+
+    const allWcTeams = { ...wcState.groupA, ...wcState.groupB };
+    const standingsA = getWcStandings('A');
+    const standingsB = getWcStandings('B');
+
+    // Get eliminated teams from playoffs
+    const playoffTeams = [standingsA[0]?.id, standingsA[1]?.id, standingsB[0]?.id, standingsB[1]?.id].filter(Boolean);
+    const wcEliminated = playoffTeams.filter(id => !wcState.winners.includes(id));
+
+    const userId = getUserId();
+    const nickname = document.getElementById('nickInput')?.value.trim() || '';
+
+    const wcPrediction = {
+        userId: userId,
+        nickname: nickname || null,
+        userColor: getColorFromUserId(userId),
+        timestamp: new Date().toISOString(),
+        localTime: new Date().toLocaleString('ru-RU'),
+        type: 'wildcard',
+        // Wild Card qualified teams (going to M7)
+        qualified: wcState.winners.map(id => ({
+            code: allWcTeams[id]?.code,
+            name: allWcTeams[id]?.name,
+            score: `${allWcTeams[id]?.matchWins || 0}-${allWcTeams[id]?.matchLosses || 0}`
+        })),
+        // Wild Card eliminated teams
+        eliminated: wcEliminated.map(id => ({
+            code: allWcTeams[id]?.code,
+            name: allWcTeams[id]?.name,
+            score: `${allWcTeams[id]?.matchWins || 0}-${allWcTeams[id]?.matchLosses || 0}`
+        })),
+        // Group standings
+        groupA: standingsA.map(t => ({
+            code: t.code,
+            name: t.name,
+            matchWins: t.matchWins,
+            matchLosses: t.matchLosses
+        })),
+        groupB: standingsB.map(t => ({
+            code: t.code,
+            name: t.name,
+            matchWins: t.matchWins,
+            matchLosses: t.matchLosses
+        })),
+        // Playoff results
+        playoffs: {
+            match1: {
+                team1: standingsA[0]?.code,
+                team2: standingsB[1]?.code,
+                winner: allWcTeams[wcState.playoffs.match1]?.code
+            },
+            match2: {
+                team1: standingsB[0]?.code,
+                team2: standingsA[1]?.code,
+                winner: allWcTeams[wcState.playoffs.match2]?.code
+            }
+        }
+    };
+
+    console.log('Saving wcPrediction:', wcPrediction);
+
+    db.collection('predictions').add(wcPrediction)
+        .then((docRef) => {
+            console.log('✅ Wild Card prediction saved! ID:', docRef.id);
+            showSaveNotification('success');
+        })
+        .catch(err => {
+            console.error('❌ Error saving Wild Card:', err);
+            alert('Ошибка сохранения: ' + err.message);
+            showSaveNotification('error');
+        });
+}
+
 function savePrediction(retryCount = 0) {
     if (typeof db === 'undefined') {
         console.log('Firebase not configured - skipping save');
@@ -1202,13 +1346,16 @@ function savePrediction(retryCount = 0) {
     const qualified = Object.values(state.teams).filter(t => t.qualified);
     const eliminated = Object.values(state.teams).filter(t => t.eliminated);
     const userId = getUserId();
+    const nickname = document.getElementById('nickInput')?.value.trim() || '';
 
     const predictionData = {
         userId: userId,
+        nickname: nickname || null,
         userColor: getColorFromUserId(userId),
         timestamp: new Date().toISOString(),
         localTime: new Date().toLocaleString('ru-RU'),
         isComplete: isTournamentComplete(),
+        type: 'swiss', // Default type
         qualified: qualified.map(t => ({
             code: t.code,
             name: t.name,
@@ -1235,6 +1382,59 @@ function savePrediction(retryCount = 0) {
             winner: m.winner
         }))
     };
+
+    // Add Wild Card data from localStorage (saved when transitioning from WC to Swiss)
+    const savedWcData = localStorage.getItem('m7_wildcard_data');
+    console.log('Checking localStorage for Wild Card data:', savedWcData ? 'FOUND' : 'NOT FOUND');
+
+    if (savedWcData) {
+        try {
+            const wcData = JSON.parse(savedWcData);
+            console.log('✅ Adding Wild Card data to prediction from localStorage!', wcData);
+
+            // Build wildcardData from saved localStorage
+            predictionData.wildcardData = {
+                groupA: wcData.groupA.map(t => ({
+                    code: t.code,
+                    name: t.name,
+                    matchWins: t.matchWins,
+                    matchLosses: t.matchLosses
+                })),
+                groupB: wcData.groupB.map(t => ({
+                    code: t.code,
+                    name: t.name,
+                    matchWins: t.matchWins,
+                    matchLosses: t.matchLosses
+                })),
+                playoffs: {
+                    match1: {
+                        team1: wcData.groupA[0]?.code,
+                        team2: wcData.groupB[1]?.code,
+                        winner: wcData.groupA.find(t => t.id === wcData.playoffs.match1)?.code ||
+                            wcData.groupB.find(t => t.id === wcData.playoffs.match1)?.code
+                    },
+                    match2: {
+                        team1: wcData.groupB[0]?.code,
+                        team2: wcData.groupA[1]?.code,
+                        winner: wcData.groupA.find(t => t.id === wcData.playoffs.match2)?.code ||
+                            wcData.groupB.find(t => t.id === wcData.playoffs.match2)?.code
+                    }
+                },
+                qualified: wcData.winners.map(id =>
+                    wcData.groupA.find(t => t.id === id)?.code ||
+                    wcData.groupB.find(t => t.id === id)?.code
+                ).filter(Boolean),
+                eliminated: wcData.eliminatedIds.map(id =>
+                    wcData.groupA.find(t => t.id === id)?.code ||
+                    wcData.groupB.find(t => t.id === id)?.code
+                ).filter(Boolean)
+            };
+
+            console.log('wildcardData added:', predictionData.wildcardData);
+        } catch (e) {
+            console.error('Error parsing Wild Card data:', e);
+        }
+    }
 
     return db.collection('predictions').add(predictionData)
         .then(() => {
@@ -1387,20 +1587,24 @@ function renderFlowTeamIcons(container, trans) {
             html += `
                 <div class="flow-pool-group ${posClass}">
                     <div class="flow-bar flow-bar-winner">
-                        ${group.winners.map(t => `
+                        ${group.winners.map(t => {
+                const flag = t.flag ? `<img src="${t.flag}" class="flow-flag">` : '';
+                return `
                             <div class="flow-team">
-                                <img src="${t.flag}" class="flow-flag">
+                                ${flag}
                                 <img src="${t.logo}" class="flow-logo">
-                            </div>
-                        `).join('')}
+                            </div>`;
+            }).join('')}
                     </div>
                     <div class="flow-bar flow-bar-loser">
-                        ${group.losers.map(t => `
+                        ${group.losers.map(t => {
+                const flag = t.flag ? `<img src="${t.flag}" class="flow-flag">` : '';
+                return `
                             <div class="flow-team">
-                                <img src="${t.flag}" class="flow-flag">
+                                ${flag}
                                 <img src="${t.logo}" class="flow-logo">
-                            </div>
-                        `).join('')}
+                            </div>`;
+            }).join('')}
                     </div>
                 </div>
             `;
@@ -1425,10 +1629,7 @@ function openSaveModal() {
     modalInput.focus();
 }
 
-// Handler for Save button - saves directly using panel input
-document.getElementById('saveBtn')?.addEventListener('click', () => {
-    savePrediction();
-});
+// Handler for Save button is now in setupModeSelection()
 
 document.getElementById('closeNickBtn')?.addEventListener('click', () => {
     document.getElementById('nickModal').classList.add('hidden');
@@ -1557,5 +1758,4 @@ window.checkAutoAdvance = function () {
     }
 };
 
-// Initialize on page load
-init();
+// Initialization is already handled by DOMContentLoaded listener
